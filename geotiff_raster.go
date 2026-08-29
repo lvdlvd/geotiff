@@ -34,7 +34,7 @@ func ReadSamples(ifd *IFD) ([]float32, error) {
 		return nil, fmt.Errorf("samples/pixel=%d unsupported (DEM expects 1)", spp)
 	}
 	bps := int(firstU16(ifd.Value(BitsPerSample)))
-	if bps != 16 && bps != 32 {
+	if bps != 8 && bps != 16 && bps != 32 {
 		return nil, fmt.Errorf("bits/sample=%d unsupported", bps)
 	}
 	bpp := bps / 8
@@ -169,6 +169,8 @@ func undoHPredictor(b []byte, w, h, bpp int) {
 		row := b[y*w*bpp:]
 		for x := 1; x < w; x++ {
 			switch bpp {
+			case 1:
+				row[x] += row[x-1]
 			case 2:
 				prev := binary.LittleEndian.Uint16(row[(x-1)*2:])
 				cur := binary.LittleEndian.Uint16(row[x*2:])
@@ -212,6 +214,10 @@ func undoFloatPredictor(b []byte, w, h, bpp int, order binary.ByteOrder) {
 func bytesToFloat32(b []byte, n, bps int, sf SampleFormatType, order binary.ByteOrder) ([]float32, error) {
 	out := make([]float32, n)
 	switch {
+	case bps == 8 && sf == Unsigned:
+		for i := 0; i < n; i++ {
+			out[i] = float32(b[i])
+		}
 	case bps == 16 && sf == Signed:
 		for i := 0; i < n; i++ {
 			out[i] = float32(int16(order.Uint16(b[i*2:])))
